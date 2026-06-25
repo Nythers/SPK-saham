@@ -342,7 +342,7 @@ if "Input" in page:
                 scale = 1.0 / total
                 for c in ch:
                     st.session_state[f"slider_{c}"] = round(
-                        st.session_state[f"slider_{c}"] * scale, 4
+                        st.session_state[f"slider_{c}"] * scale, 3
                     )
 
         def _reset_to_zero() -> None:
@@ -355,7 +355,7 @@ if "Input" in page:
             ch = st.session_state.get("_chosen_now", [])
             n = len(ch)
             if n > 0:
-                equal = round(1.0 / n, 4)
+                equal = round(1.0 / n, 3)
                 for c in ch:
                     st.session_state[f"slider_{c}"] = equal
 
@@ -371,6 +371,7 @@ if "Input" in page:
                 max_value=1.0,
                 step=0.01,
                 key=f"slider_{c}",
+                format="%.3f",
                 on_change=_rebalance_on_overflow,
             )
             weights[c] = w
@@ -512,7 +513,7 @@ elif "Hasil" in page:
     )
 
     st.dataframe(
-        result.style.format({"D+": "{:.4f}", "D-": "{:.4f}", "Preferensi (C)": "{:.4f}"}),
+        result.style.format({"D+": "{:.5f}", "D-": "{:.5f}", "Preferensi (C)": "{:.5f}"}),
         use_container_width=True,
         hide_index=True,
     )
@@ -665,19 +666,7 @@ else:
             help="Jeda lebih besar = lebih aman terhadap rate-limit Yahoo Finance, tapi lebih lambat.",
         )
         tahun_label = int(pd.Timestamp.today().year)
-        mode_strict = st.toggle(
-            "Mode strict (buang baris tidak lengkap)",
-            value=False,
-            help="Jika nyala: emiten dengan rasio kurang dari 8 akan dibuang. "
-                 "Jika mati (default): rasio yang hilang diisi median agar SEMUA ticker tetap dipakai.",
-        )
-        max_missing = st.slider(
-            "Maks. rasio hilang per ticker",
-            0, 7, 5,
-            help="Ticker yang punya lebih dari N rasio hilang akan dibuang. "
-                 "Default 5 berarti minimal 3 dari 8 rasio harus ada.",
-            disabled=mode_strict,
-        )
+        
 
     st.caption(f"Akan men-scrape **{len(ticker_list_jk)} ticker**.")
 
@@ -701,8 +690,8 @@ else:
                 raw = scrape_basic_material(ticker_list_jk, sleep=sleep, progress_callback=_cb)
                 clean = preprocess(
                     raw,
-                    impute_missing=not mode_strict,
-                    max_missing_per_row=0 if mode_strict else max_missing,
+                    impute_missing=False,
+                    max_missing_per_row=0,
                 )
                 if len(clean) > 0:
                     clean.insert(0, "Tahun", int(tahun_label))
@@ -726,11 +715,10 @@ else:
                     n_input  = len(raw)
                     n_output = len(clean)
                     msg = f"Berhasil meng-scrape **{n_output} dari {n_input}** emiten."
-                    if not mode_strict:
-                        cols_present = [c for c in SCRAPER_CRITERIA_COLS if c in raw.columns]
-                        n_imputed = int(raw[cols_present].isna().sum().sum()) if cols_present else 0
-                        if n_imputed > 0:
-                            msg += f" {n_imputed} nilai rasio yang hilang diisi median kolom."
+                    cols_present = [c for c in SCRAPER_CRITERIA_COLS if c in raw.columns]
+                    n_imputed = int(raw[cols_present].isna().sum().sum()) if cols_present else 0
+                    if n_imputed > 0:
+                        msg += f" {n_imputed} nilai rasio yang hilang diisi median kolom."
                     st.success(msg)
                     st.session_state["scraped_df"] = clean
                     st.session_state["scraped_raw"] = raw
